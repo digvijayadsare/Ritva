@@ -1,0 +1,36 @@
+
+PARAMPARA - ANDROID MVP SPECIFICATION
+
+1. FIREBASE DATA MODEL (Firestore)
+----------------------------------
+- Collections:
+  - users: { uid: string, name: string, phone: string, familyId: string, role: "ADMIN" | "MEMBER" }
+  - families: { id: string, name: string, adminId: string, members: string[] }
+  - traditions: { 
+      id: string, familyId: string, title: string, category: string, description: string,
+      linkedFestivalId: string?, linkedTithi: { month: string, paksha: string, tithi: number }?,
+      steps: [ { id: string, title: string, instructions: string, mediaUrl: string, mediaType: "VIDEO" | "IMAGE" } ]
+    }
+  - ancestors: { id: string, familyId: string, name: string, relation: string, photoUrl: string, punyaTithi: { month: string, paksha: string, tithi: number } }
+  - festivals: { id: string, name: string, tithi: { month: string, paksha: string, tithi: number }, generalDescription: string }
+
+2. PANCHANG INTEGRATION APPROACH
+-------------------------------
+- For a native Android app, use a custom Panchang calculator library or a server-side Cloud Function that wraps ephemeris data (e.g., Swiss Ephemeris) to provide Tithi conversion for the specific year.
+- Amanta vs Purnimanta: The requirement specifies Amanta (predominant in South/West India).
+- Calendar Mapping logic: 
+  - Each day, fetch Tithi data from local room DB or Firebase.
+  - A Tithi can start at any time; typically, the Tithi prevailing at sunrise is the Tithi for the day.
+
+3. KOTLIN SCAFFOLDING GUIDANCE
+-----------------------------
+- Auth: Use Firebase Phone Auth `PhoneAuthProvider.getInstance()`.
+- Navigation: Jetpack Navigation Component with BottomNavigationView.
+- Media: use CameraX for video/photo capture and Firebase Storage for uploading.
+- Steps: Use a RecyclerView with ListAdapter for dynamic step lists in the "Create" screen.
+
+4. ASSUMPTIONS & CONSTRAINTS
+---------------------------
+- The MVP assumes a fixed Amanta month system.
+- Video length is capped at 10 minutes to manage storage costs.
+- User location (needed for precise Panchang) is defaulted to India Standard Time (IST).
