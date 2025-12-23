@@ -1,7 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../store';
-import { ChevronRight, Plus, User, Trash2, Edit2, X, Heart, Users, ChevronDown, Save, UserMinus, UserPlus } from 'lucide-react';
+import { 
+  ChevronRight, Plus, User, Trash2, Edit2, X, Heart, Users, 
+  ChevronDown, Save, UserMinus, UserPlus, Info, AlertTriangle,
+  ZoomIn, ZoomOut, Maximize
+} from 'lucide-react';
 import { FamilyMember } from '../types';
 
 export const FamilyTree: React.FC = () => {
@@ -9,7 +13,9 @@ export const FamilyTree: React.FC = () => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [addMode, setAddMode] = useState<'Child' | 'Spouse'>('Child');
+  const [zoom, setZoom] = useState(1);
 
   const lineage = family?.lineage || [];
 
@@ -24,6 +30,10 @@ export const FamilyTree: React.FC = () => {
     lineage.find(m => m.id === selectedMemberId), 
     [lineage, selectedMemberId]
   );
+
+  const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
+  const handleResetZoom = () => setZoom(1);
 
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +51,6 @@ export const FamilyTree: React.FC = () => {
       newMember.parentId = selectedMemberId;
     } else if (addMode === 'Spouse') {
       newMember.spouseId = selectedMemberId;
-      // Link the existing member to this new spouse
       updateFamilyMember(selectedMemberId, { spouseId: newMember.id });
     }
     
@@ -63,10 +72,11 @@ export const FamilyTree: React.FC = () => {
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to remove this family member? This will also remove their connections.")) {
-      deleteFamilyMember(id);
+  const confirmDelete = (deleteDescendants: boolean) => {
+    if (selectedMemberId) {
+      deleteFamilyMember(selectedMemberId, deleteDescendants);
       setSelectedMemberId(null);
+      setShowDeleteDialog(false);
     }
   };
 
@@ -84,28 +94,17 @@ export const FamilyTree: React.FC = () => {
     setIsEditing(true);
   };
 
-  // Build Hierarchy
   const renderGenerations = () => {
-    // REFINED ROOT LOGIC to prevent duplicates
-    // A root is someone who:
-    // 1. Has no parentId
-    // 2. AND if they have a spouse, that spouse ALSO has no parentId (otherwise they'd be rendered as an in-law elsewhere)
-    // 3. AND apply a tie-breaker so only one member of a root couple starts the render (Male or lower ID)
     const roots = lineage.filter(m => {
       const hasParent = !!m.parentId;
       if (hasParent) return false;
-
       const spouse = lineage.find(s => s.id === m.spouseId);
-      // If spouse has a parent, this person is an in-law and will be rendered under the spouse's bloodline
       if (spouse && spouse.parentId) return false;
-
-      // Both have no parent (or no spouse): apply tie-breaker
       if (spouse) {
         if (m.gender === 'Male' && spouse.gender !== 'Male') return true;
         if (m.gender === 'Female' && spouse.gender === 'Male') return false;
-        return m.id < spouse.id; // Final tie-breaker for same-gender couples or missing gender
+        return m.id < spouse.id;
       }
-      
       return true;
     });
     
@@ -113,7 +112,6 @@ export const FamilyTree: React.FC = () => {
       const spouse = lineage.find(m => m.id === member.spouseId);
       const children = lineage.filter(m => m.parentId === member.id || (spouse && m.parentId === spouse.id));
       
-      // Ensure Male is always Left and Female is Right for visual consistency
       let leftMember = member;
       let rightMember = spouse;
 
@@ -128,107 +126,98 @@ export const FamilyTree: React.FC = () => {
       const isAnyInCoupleSelected = (leftMember && selectedMemberId === leftMember.id) || (rightMember && selectedMemberId === rightMember.id);
 
       return (
-        <div key={member.id} className="mb-12 last:mb-0">
-          {/* Couple Card - Using better padding and flex-wrap to handle long names */}
-          <div className={`p-4 sm:p-6 rounded-[2.5rem] transition-all border-2 ${
-            isAnyInCoupleSelected ? 'bg-orange-50 border-orange-300 shadow-xl' : 'bg-white border-orange-100 shadow-sm'
+        <div key={member.id} className="flex flex-col items-center mb-16 last:mb-0 min-w-max">
+          <div className={`p-4 sm:p-6 rounded-[2.5rem] transition-all border-4 relative ${
+            isAnyInCoupleSelected ? 'bg-orange-50 border-orange-400 shadow-2xl z-10' : 'bg-white border-orange-100 shadow-lg'
           }`}>
-            <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-stretch">
-              {/* Left Member */}
+            <div className="flex gap-4 sm:gap-8 items-center">
+              {/* Father (Left) */}
               <div 
                 onClick={() => setSelectedMemberId(leftMember.id)}
-                className={`flex-1 w-full min-w-0 flex items-start gap-4 p-4 rounded-3xl transition-all cursor-pointer ${isSelected(leftMember.id) ? 'bg-orange-800 text-white' : 'bg-white hover:bg-orange-50'}`}
+                className={`w-40 sm:w-52 p-5 rounded-3xl transition-all cursor-pointer flex flex-col items-center text-center ${isSelected(leftMember.id) ? 'bg-orange-800 text-white' : 'hover:bg-orange-50'}`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 mb-3 ${
                   leftMember.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'
-                } ${isSelected(leftMember.id) ? 'brightness-125 shadow-inner' : 'shadow-sm'}`}>
-                  <User size={24} />
+                } ${isSelected(leftMember.id) ? 'brightness-125' : ''}`}>
+                  <User size={32} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className={`font-black text-sm leading-tight mb-1 break-words hyphens-auto ${isSelected(leftMember.id) ? 'text-white' : 'text-orange-950'}`}>
-                    {leftMember.name}
-                  </h4>
-                  <p className={`text-[10px] font-black uppercase tracking-widest ${isSelected(leftMember.id) ? 'text-white/70' : 'text-orange-900/40'}`}>
-                    {leftMember.relation || 'Ancestor'} {leftMember.isDeceased && '• Late'}
-                  </p>
-                </div>
+                <h4 className={`font-black text-sm sm:text-base leading-tight mb-1 break-words w-full ${isSelected(leftMember.id) ? 'text-white' : 'text-orange-950'}`}>
+                  {leftMember.name}
+                </h4>
+                <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isSelected(leftMember.id) ? 'text-white/70' : 'text-orange-900/40'}`}>
+                  {leftMember.relation || (leftMember.gender === 'Male' ? 'Father' : 'Mother')}
+                </span>
+                {leftMember.isDeceased && <span className="text-[9px] mt-1 font-bold text-red-400 uppercase tracking-widest">In Memory</span>}
               </div>
 
-              {/* Union Marker */}
+              {/* Union Heart */}
               {rightMember && (
-                <div className="flex items-center justify-center shrink-0 py-2 sm:py-0">
-                  <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
-                    <Heart size={16} className="text-red-500" fill="currentColor" />
+                <div className="flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shadow-inner">
+                    <Heart size={20} className="text-red-500" fill="currentColor" />
                   </div>
                 </div>
               )}
 
-              {/* Right Member */}
+              {/* Mother (Right) */}
               {rightMember ? (
                 <div 
                   onClick={() => setSelectedMemberId(rightMember.id)}
-                  className={`flex-1 w-full min-w-0 flex items-start gap-4 p-4 rounded-3xl transition-all cursor-pointer ${isSelected(rightMember.id) ? 'bg-orange-800 text-white' : 'bg-white hover:bg-orange-50'}`}
+                  className={`w-40 sm:w-52 p-5 rounded-3xl transition-all cursor-pointer flex flex-col items-center text-center ${isSelected(rightMember.id) ? 'bg-orange-800 text-white' : 'hover:bg-orange-50'}`}
                 >
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 mb-3 ${
                     rightMember.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'
-                  } ${isSelected(rightMember.id) ? 'brightness-125 shadow-inner' : 'shadow-sm'}`}>
-                    <User size={24} />
+                  } ${isSelected(rightMember.id) ? 'brightness-125' : ''}`}>
+                    <User size={32} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className={`font-black text-sm leading-tight mb-1 break-words hyphens-auto ${isSelected(rightMember.id) ? 'text-white' : 'text-orange-950'}`}>
-                      {rightMember.name}
-                    </h4>
-                    <p className={`text-[10px] font-black uppercase tracking-widest ${isSelected(rightMember.id) ? 'text-white/70' : 'text-orange-900/40'}`}>
-                      {rightMember.relation || 'Spouse'} {rightMember.isDeceased && '• Late'}
-                    </p>
-                  </div>
+                  <h4 className={`font-black text-sm sm:text-base leading-tight mb-1 break-words w-full ${isSelected(rightMember.id) ? 'text-white' : 'text-orange-950'}`}>
+                    {rightMember.name}
+                  </h4>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${isSelected(rightMember.id) ? 'text-white/70' : 'text-orange-900/40'}`}>
+                    {rightMember.relation || (rightMember.gender === 'Female' ? 'Mother' : 'Father')}
+                  </span>
+                  {rightMember.isDeceased && <span className="text-[9px] mt-1 font-bold text-red-400 uppercase tracking-widest">In Memory</span>}
                 </div>
               ) : (
-                // "Add Spouse" Placeholder
                 isSelected(leftMember.id) && (
                   <button 
                     onClick={() => { setAddMode('Spouse'); setIsAdding(true); }}
-                    className="flex-1 w-full border-2 border-dashed border-orange-200 rounded-3xl flex items-center justify-center text-orange-400 hover:bg-orange-50 transition-colors p-4"
+                    className="w-40 sm:w-52 h-full border-4 border-dashed border-orange-100 rounded-3xl flex flex-col items-center justify-center text-orange-200 hover:bg-orange-50 transition-all p-5"
                   >
-                    <Plus size={20} />
-                    <span className="text-[10px] font-black uppercase ml-2 tracking-widest">Add Spouse</span>
+                    <Plus size={32} />
+                    <span className="text-[10px] font-black uppercase mt-2 tracking-widest">Add Mother</span>
                   </button>
                 )
               )}
             </div>
 
-            {/* Quick Actions Footer */}
+            {/* Selection Actions Overlay */}
             {isAnyInCoupleSelected && selectedMember && (
-              <div className="mt-6 pt-6 border-t border-orange-100 flex flex-wrap items-center justify-between gap-4 animate-slide-up">
-                <div className="flex gap-3">
-                  <button 
-                    onClick={() => openEdit(selectedMember)}
-                    className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-100 transition-colors"
-                  >
-                    <Edit2 size={20} />
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(selectedMember.id)}
-                    className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 transition-colors"
-                    title="Remove member"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+              <div className="mt-6 pt-6 border-t-2 border-orange-100 flex items-center justify-between gap-4 animate-slide-up">
+                <div className="flex gap-2">
+                  <button onClick={() => openEdit(selectedMember)} className="p-4 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-100 shadow-sm"><Edit2 size={24} /></button>
+                  <button onClick={() => setShowDeleteDialog(true)} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-100 shadow-sm"><Trash2 size={24} /></button>
                 </div>
-                
                 <button 
                   onClick={() => { setAddMode('Child'); setIsAdding(true); }}
-                  className="bg-orange-950 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform shadow-lg"
+                  className="bg-orange-950 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center gap-2 active:scale-95 transition-transform shadow-xl"
                 >
-                  <Plus size={16} /> Add Descendant
+                  <Plus size={20} /> Add Child
                 </button>
               </div>
             )}
           </div>
 
-          {/* Recursive Child Branch */}
+          {/* Vertical Path to Children */}
           {children.length > 0 && (
-            <div className="ml-6 sm:ml-12 mt-8 border-l-4 border-orange-100 pl-6 sm:pl-10 space-y-8 relative">
+            <div className="w-1 h-16 bg-orange-200 relative">
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-orange-200"></div>
+            </div>
+          )}
+
+          {/* Children Branch Layout */}
+          {children.length > 0 && (
+            <div className="flex gap-12 sm:gap-24 relative pt-4 px-12 border-t-4 border-orange-100 rounded-t-[4rem]">
               {children.map(child => renderCoupleNode(child))}
             </div>
           )}
@@ -240,43 +229,95 @@ export const FamilyTree: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-24">
-      <header className="py-2 flex justify-between items-center">
+    <div className="h-full flex flex-col relative overflow-hidden">
+      <header className="px-6 py-4 flex justify-between items-center bg-white shadow-sm border-b border-orange-50 z-20">
         <div>
-          <h1 className="title-font text-3xl text-orange-950 font-black">Family Tree</h1>
-          <p className="text-orange-900/60 text-[10px] font-bold uppercase tracking-widest">Ancestral Lineage</p>
+          <h1 className="title-font text-3xl text-orange-950 font-black">Lineage Vault</h1>
+          <p className="text-orange-900/60 text-[10px] font-bold uppercase tracking-widest">Apli Parampara</p>
         </div>
-        <div className="p-3 bg-white rounded-2xl shadow-sm border border-orange-100">
-           <Users className="text-orange-900" size={24} />
+        <div className="p-3 bg-orange-50 rounded-2xl">
+           <Users className="text-orange-950" size={24} />
         </div>
       </header>
 
-      <div className="bg-orange-50 p-6 rounded-[2rem] border-2 border-orange-100/50 flex gap-4 items-center">
-        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm">
-          <Heart size={24} className="text-red-500" fill="currentColor" />
-        </div>
-        <div className="flex-1">
-          <p className="text-orange-950 text-[11px] font-black uppercase tracking-wider mb-1">Navigation Tip</p>
-          <p className="text-orange-900/70 text-[11px] font-bold leading-relaxed">
-            Tap a name to edit or add family members. Deleting a member removes them from the vault permanently.
-          </p>
+      {/* Zoom Controls Overlay */}
+      <div className="absolute bottom-24 right-6 z-30 flex flex-col gap-3">
+        <button 
+          onClick={handleZoomIn}
+          className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform"
+        >
+          <ZoomIn size={24} />
+        </button>
+        <button 
+          onClick={handleResetZoom}
+          className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform flex items-center justify-center"
+        >
+          <Maximize size={24} />
+        </button>
+        <button 
+          onClick={handleZoomOut}
+          className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform"
+        >
+          <ZoomOut size={24} />
+        </button>
+        <div className="bg-orange-950 text-white text-[10px] font-black px-3 py-1 rounded-full text-center shadow-lg uppercase tracking-widest">
+          {Math.round(zoom * 100)}%
         </div>
       </div>
 
-      <div className="mt-8">
+      {/* Interactive Tree View */}
+      <div className="flex-1 overflow-auto bg-[#FDF7F2] p-8 sm:p-20 hide-scrollbar cursor-grab active:cursor-grabbing">
         {lineage.length === 0 ? (
-          <div className="text-center py-24 px-8 bg-white rounded-[3rem] border-2 border-dashed border-orange-100">
-            <User size={48} className="mx-auto text-orange-100 mb-6" />
-            <p className="font-bold text-gray-400 max-w-[200px] mx-auto leading-relaxed">
-              Lineage vault is currently empty.
-            </p>
+          <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+            <Users size={64} className="mb-4 text-orange-200" />
+            <p className="font-black text-orange-900/50 uppercase tracking-widest">No lineage data available</p>
           </div>
         ) : (
-          <div className="animate-slide-up">
-            {renderGenerations()}
+          <div 
+            className="inline-block transition-transform duration-300 ease-out origin-top-left"
+            style={{ transform: `scale(${zoom})` }}
+          >
+             {renderGenerations()}
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal (Android Style) */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
+          <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 space-y-6 shadow-2xl border-b-8 border-red-500">
+            <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-2">
+              <AlertTriangle size={32} />
+            </div>
+            <div className="text-center">
+              <h2 className="title-font text-2xl text-gray-900 font-bold mb-2">Delete Lineage Node?</h2>
+              <p className="text-gray-500 text-sm leading-relaxed">
+                You are deleting <span className="font-black text-gray-950">{selectedMember?.name}</span>. How would you like to proceed?
+              </p>
+            </div>
+            <div className="space-y-3 pt-2">
+              <button 
+                onClick={() => confirmDelete(true)}
+                className="w-full py-5 bg-red-600 text-white rounded-3xl font-black text-sm uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+              >
+                Delete All Descendants
+              </button>
+              <button 
+                onClick={() => confirmDelete(false)}
+                className="w-full py-5 bg-orange-50 text-orange-900 rounded-3xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all"
+              >
+                Keep Descendants Only
+              </button>
+              <button 
+                onClick={() => setShowDeleteDialog(false)}
+                className="w-full py-4 text-gray-400 font-bold text-xs uppercase tracking-widest"
+              >
+                Cancel Deletion
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {(isAdding || isEditing) && (
@@ -285,10 +326,10 @@ export const FamilyTree: React.FC = () => {
             <div className="flex justify-between items-center">
               <div>
                 <h2 className="title-font text-2xl text-orange-950 font-black">
-                  {isEditing ? 'Update Profile' : `Add ${addMode}`}
+                  {isEditing ? 'Profile Settings' : `Add ${addMode}`}
                 </h2>
                 {!isEditing && (
-                  <p className="text-[10px] text-orange-900/60 font-black uppercase tracking-widest mt-1">Connecting to {selectedMember?.name}</p>
+                  <p className="text-[10px] text-orange-900/60 font-black uppercase tracking-widest mt-1">Linking to {selectedMember?.name}</p>
                 )}
               </div>
               <button 
@@ -353,7 +394,7 @@ export const FamilyTree: React.FC = () => {
                 </div>
                 <div>
                   <label className="font-black text-orange-950 text-xs uppercase tracking-widest block">In Loving Memory</label>
-                  <p className="text-[9px] font-bold text-orange-900/40">Toggle if deceased (Legacy marker)</p>
+                  <p className="text-[9px] font-bold text-orange-900/40">Visible heritage marker</p>
                 </div>
               </div>
 
@@ -363,18 +404,8 @@ export const FamilyTree: React.FC = () => {
                   className="w-full py-6 bg-orange-900 text-white rounded-[2.5rem] font-black text-lg shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-3"
                 >
                   {isEditing ? <Save size={20} /> : <UserPlus size={20} />}
-                  <span>{isEditing ? 'Save Changes' : `Add to ${family?.name}`}</span>
+                  <span>{isEditing ? 'Sync Profile' : 'Link to Ancestors'}</span>
                 </button>
-                
-                {isEditing && (
-                  <button 
-                    type="button"
-                    onClick={() => handleDelete(selectedMemberId!)}
-                    className="w-full py-4 text-red-500 font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2"
-                  >
-                    <UserMinus size={14} /> Remove Permanently
-                  </button>
-                )}
               </div>
             </form>
           </div>

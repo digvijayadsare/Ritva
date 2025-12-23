@@ -16,7 +16,7 @@ interface AppState {
   updateFamilyDetails: (details: Partial<Family>) => void;
   addFamilyMember: (member: FamilyMember) => void;
   updateFamilyMember: (id: string, updates: Partial<FamilyMember>) => void;
-  deleteFamilyMember: (id: string) => void;
+  deleteFamilyMember: (id: string, deleteDescendants: boolean) => void;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
@@ -99,17 +99,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const deleteFamilyMember = (id: string) => {
+  const deleteFamilyMember = (id: string, deleteDescendants: boolean) => {
     setFamily(prev => {
       if (!prev) return null;
-      // Also clean up references (parentId, spouseId)
+
+      let idsToRemove = new Set<string>();
+      
+      if (deleteDescendants) {
+        const collectDescendants = (parentId: string) => {
+          idsToRemove.add(parentId);
+          prev.lineage.forEach(m => {
+            if (m.parentId === parentId) collectDescendants(m.id);
+          });
+        };
+        collectDescendants(id);
+      } else {
+        idsToRemove.add(id);
+      }
+
       const newLineage = prev.lineage
-        .filter(m => m.id !== id)
+        .filter(m => !idsToRemove.has(m.id))
         .map(m => ({
           ...m,
-          parentId: m.parentId === id ? undefined : m.parentId,
-          spouseId: m.spouseId === id ? undefined : m.spouseId
+          parentId: idsToRemove.has(m.parentId || '') ? undefined : m.parentId,
+          spouseId: idsToRemove.has(m.spouseId || '') ? undefined : m.spouseId
         }));
+
       return { ...prev, lineage: newLineage };
     });
   };

@@ -51,7 +51,7 @@ export interface FamilyMember {
   name: string;
   relation: string;
   gender: 'Male' | 'Female' | 'Other';
-  parentId?: string; // Links to parent node for tree structure
+  parentId?: string; // Original parent link
   spouseId?: string; // Links to spouse node
   isDeceased: boolean;
   punyaTithi?: PanchangTithi;
