@@ -38,21 +38,26 @@ export const FamilyTree: React.FC = () => {
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
 
   const focusSelf = () => {
-    setZoom(1); // Reset zoom to 100% as requested for "Fit to screen" behavior
+    setZoom(1); // Set zoom to 100% for fit-to-screen feel
+    // Small delay to let browser handle the zoom transformation before scrolling
     setTimeout(() => {
       if (selfRef.current) {
-        selfRef.current.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        selfRef.current.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center', 
+          inline: 'center' 
+        });
         const selfMember = lineage.find(m => m.relation?.toLowerCase() === 'self');
         if (selfMember) setSelectedMemberId(selfMember.id);
       }
-    }, 100);
+    }, 150);
   };
 
   // Auto-focus self on initial mount
   useEffect(() => {
     const timer = setTimeout(() => {
       focusSelf();
-    }, 500);
+    }, 800);
     return () => clearTimeout(timer);
   }, []);
 
