@@ -1,10 +1,9 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const generateRitualGuide = async (title: string, category: string) => {
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Generate a complete ritual guide for "${title}" (${category}). 
@@ -12,7 +11,6 @@ export const generateRitualGuide = async (title: string, category: string) => {
       For each step, provide a title, detailed description, and a relevant short Sanskrit Mantra (with transliteration). 
       Format as JSON.`,
       config: {
-        // Move expert context to systemInstruction as per best practices.
         systemInstruction: "You are an expert in Hindu Vedic traditions.",
         responseMimeType: "application/json",
         responseSchema: {
@@ -38,7 +36,6 @@ export const generateRitualGuide = async (title: string, category: string) => {
       }
     });
 
-    // Access the text property directly (not a method) as per guidelines.
     const text = response.text;
     if (!text) {
       throw new Error("Empty response from Gemini");

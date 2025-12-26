@@ -1,10 +1,10 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useApp } from '../store';
 import { 
   ChevronRight, Plus, User, Trash2, Edit2, X, Heart, Users, 
   ChevronDown, Save, UserMinus, UserPlus, Info, AlertTriangle,
-  ZoomIn, ZoomOut, Maximize
+  ZoomIn, ZoomOut, Maximize, Target
 } from 'lucide-react';
 import { FamilyMember } from '../types';
 
@@ -16,6 +16,9 @@ export const FamilyTree: React.FC = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [addMode, setAddMode] = useState<'Child' | 'Spouse'>('Child');
   const [zoom, setZoom] = useState(1);
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const selfRef = useRef<HTMLDivElement>(null);
 
   const lineage = family?.lineage || [];
 
@@ -34,6 +37,24 @@ export const FamilyTree: React.FC = () => {
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
   const handleResetZoom = () => setZoom(1);
+
+  const focusSelf = () => {
+    setZoom(1);
+    if (selfRef.current) {
+      selfRef.current.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      // Identify the ID for visual feedback
+      const selfMember = lineage.find(m => m.relation?.toLowerCase() === 'self');
+      if (selfMember) setSelectedMemberId(selfMember.id);
+    }
+  };
+
+  // Auto-focus self on initial mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      focusSelf();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleAddMember = (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,17 +145,20 @@ export const FamilyTree: React.FC = () => {
 
       const isSelected = (mId: string) => selectedMemberId === mId;
       const isAnyInCoupleSelected = (leftMember && selectedMemberId === leftMember.id) || (rightMember && selectedMemberId === rightMember.id);
+      const isSelf = (m: FamilyMember) => m.relation?.toLowerCase() === 'self';
 
       return (
         <div key={member.id} className="flex flex-col items-center mb-16 last:mb-0 min-w-max">
-          <div className={`p-4 sm:p-6 rounded-[2.5rem] transition-all border-4 relative ${
+          <div 
+            ref={isSelf(leftMember) || (rightMember && isSelf(rightMember)) ? selfRef : null}
+            className={`p-4 sm:p-6 rounded-[2.5rem] transition-all border-4 relative ${
             isAnyInCoupleSelected ? 'bg-orange-50 border-orange-400 shadow-2xl z-10' : 'bg-white border-orange-100 shadow-lg'
           }`}>
             <div className="flex gap-4 sm:gap-8 items-center">
-              {/* Father (Left) */}
+              {/* Left Card */}
               <div 
                 onClick={() => setSelectedMemberId(leftMember.id)}
-                className={`w-40 sm:w-52 p-5 rounded-3xl transition-all cursor-pointer flex flex-col items-center text-center ${isSelected(leftMember.id) ? 'bg-orange-800 text-white' : 'hover:bg-orange-50'}`}
+                className={`w-40 sm:w-52 p-5 rounded-3xl transition-all cursor-pointer flex flex-col items-center text-center ${isSelected(leftMember.id) ? 'bg-orange-800 text-white' : 'hover:bg-orange-50'} ${isSelf(leftMember) ? 'ring-4 ring-orange-500 ring-offset-4' : ''}`}
               >
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 mb-3 ${
                   leftMember.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'
@@ -159,11 +183,11 @@ export const FamilyTree: React.FC = () => {
                 </div>
               )}
 
-              {/* Mother (Right) */}
+              {/* Right Card */}
               {rightMember ? (
                 <div 
                   onClick={() => setSelectedMemberId(rightMember.id)}
-                  className={`w-40 sm:w-52 p-5 rounded-3xl transition-all cursor-pointer flex flex-col items-center text-center ${isSelected(rightMember.id) ? 'bg-orange-800 text-white' : 'hover:bg-orange-50'}`}
+                  className={`w-40 sm:w-52 p-5 rounded-3xl transition-all cursor-pointer flex flex-col items-center text-center ${isSelected(rightMember.id) ? 'bg-orange-800 text-white' : 'hover:bg-orange-50'} ${isSelf(rightMember) ? 'ring-4 ring-orange-500 ring-offset-4' : ''}`}
                 >
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 mb-3 ${
                     rightMember.gender === 'Female' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'
@@ -185,7 +209,7 @@ export const FamilyTree: React.FC = () => {
                     className="w-40 sm:w-52 h-full border-4 border-dashed border-orange-100 rounded-3xl flex flex-col items-center justify-center text-orange-200 hover:bg-orange-50 transition-all p-5"
                   >
                     <Plus size={32} />
-                    <span className="text-[10px] font-black uppercase mt-2 tracking-widest">Add Mother</span>
+                    <span className="text-[10px] font-black uppercase mt-2 tracking-widest">Add Spouse</span>
                   </button>
                 )
               )}
@@ -208,14 +232,14 @@ export const FamilyTree: React.FC = () => {
             )}
           </div>
 
-          {/* Vertical Path to Children */}
+          {/* Path to Children */}
           {children.length > 0 && (
             <div className="w-1 h-16 bg-orange-200 relative">
               <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-orange-200"></div>
             </div>
           )}
 
-          {/* Children Branch Layout */}
+          {/* Children Branch */}
           {children.length > 0 && (
             <div className="flex gap-12 sm:gap-24 relative pt-4 px-12 border-t-4 border-orange-100 rounded-t-[4rem]">
               {children.map(child => renderCoupleNode(child))}
@@ -229,7 +253,7 @@ export const FamilyTree: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden">
+    <div className="h-full flex flex-col relative overflow-hidden bg-[#FDF7F2]">
       <header className="px-6 py-4 flex justify-between items-center bg-white shadow-sm border-b border-orange-50 z-20">
         <div>
           <h1 className="title-font text-3xl text-orange-950 font-black">Lineage Vault</h1>
@@ -240,8 +264,15 @@ export const FamilyTree: React.FC = () => {
         </div>
       </header>
 
-      {/* Zoom Controls Overlay */}
+      {/* Zoom & Focus Controls */}
       <div className="absolute bottom-24 right-6 z-30 flex flex-col gap-3">
+        <button 
+          onClick={focusSelf}
+          title="Focus Self"
+          className="p-4 bg-orange-900 shadow-2xl rounded-2xl text-white border border-orange-800 active:scale-95 transition-transform flex items-center justify-center"
+        >
+          <Target size={24} />
+        </button>
         <button 
           onClick={handleZoomIn}
           className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform"
@@ -266,7 +297,7 @@ export const FamilyTree: React.FC = () => {
       </div>
 
       {/* Interactive Tree View */}
-      <div className="flex-1 overflow-auto bg-[#FDF7F2] p-8 sm:p-20 hide-scrollbar cursor-grab active:cursor-grabbing">
+      <div ref={containerRef} className="flex-1 overflow-auto p-8 sm:p-20 hide-scrollbar cursor-grab active:cursor-grabbing">
         {lineage.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
             <Users size={64} className="mb-4 text-orange-200" />
@@ -282,7 +313,7 @@ export const FamilyTree: React.FC = () => {
         )}
       </div>
 
-      {/* Delete Confirmation Modal (Android Style) */}
+      {/* Delete Confirmation Modal */}
       {showDeleteDialog && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-6">
           <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 space-y-6 shadow-2xl border-b-8 border-red-500">
