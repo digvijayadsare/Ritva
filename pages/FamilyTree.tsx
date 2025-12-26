@@ -36,16 +36,16 @@ export const FamilyTree: React.FC = () => {
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev + 0.1, 2));
   const handleZoomOut = () => setZoom(prev => Math.max(prev - 0.1, 0.4));
-  const handleResetZoom = () => setZoom(1);
 
   const focusSelf = () => {
-    setZoom(1);
-    if (selfRef.current) {
-      selfRef.current.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-      // Identify the ID for visual feedback
-      const selfMember = lineage.find(m => m.relation?.toLowerCase() === 'self');
-      if (selfMember) setSelectedMemberId(selfMember.id);
-    }
+    setZoom(1); // Reset zoom to 100% as requested for "Fit to screen" behavior
+    setTimeout(() => {
+      if (selfRef.current) {
+        selfRef.current.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        const selfMember = lineage.find(m => m.relation?.toLowerCase() === 'self');
+        if (selfMember) setSelectedMemberId(selfMember.id);
+      }
+    }, 100);
   };
 
   // Auto-focus self on initial mount
@@ -268,25 +268,21 @@ export const FamilyTree: React.FC = () => {
       <div className="absolute bottom-24 right-6 z-30 flex flex-col gap-3">
         <button 
           onClick={focusSelf}
-          title="Focus Self"
+          title="Fit to Screen (Focus Self)"
           className="p-4 bg-orange-900 shadow-2xl rounded-2xl text-white border border-orange-800 active:scale-95 transition-transform flex items-center justify-center"
         >
           <Target size={24} />
         </button>
         <button 
           onClick={handleZoomIn}
+          title="Zoom In"
           className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform"
         >
           <ZoomIn size={24} />
         </button>
         <button 
-          onClick={handleResetZoom}
-          className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform flex items-center justify-center"
-        >
-          <Maximize size={24} />
-        </button>
-        <button 
           onClick={handleZoomOut}
+          title="Zoom Out"
           className="p-4 bg-white shadow-xl rounded-2xl text-orange-900 border border-orange-100 active:scale-95 transition-transform"
         >
           <ZoomOut size={24} />
