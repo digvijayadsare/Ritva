@@ -4,8 +4,30 @@ import { useApp } from '../store';
 import { MARATHI_MONTHS } from '../constants';
 import { Plus, User, Calendar as CalendarIcon, Heart, X, Trash2 } from 'lucide-react';
 
+const ImageWithFallback = ({ src, name, gender, className }: { src?: string, name: string, gender?: string, className: string }) => {
+  const [error, setError] = useState(false);
+  
+  if (!src || error) {
+    return (
+      <div className={`${className} flex items-center justify-center overflow-hidden ${
+        gender === 'Female' ? 'bg-pink-50 text-pink-300' : 'bg-blue-50 text-blue-300'
+      }`}>
+        <User size={32} strokeWidth={1.5} />
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={src} 
+      className={className} 
+      alt={name} 
+      onError={() => setError(true)} 
+    />
+  );
+};
+
 export const AncestorManagement: React.FC = () => {
-  // Fix: Property 'addAncestor' does not exist on type 'AppState'. Using 'addFamilyMember' instead.
   const { ancestors, addFamilyMember } = useApp();
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({
@@ -19,7 +41,6 @@ export const AncestorManagement: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Fix: Using addFamilyMember and ensuring required fields like gender and isDeceased are provided.
     addFamilyMember({
       id: 'a' + Date.now(),
       name: formData.name,
@@ -27,7 +48,7 @@ export const AncestorManagement: React.FC = () => {
       gender: formData.gender,
       isDeceased: true,
       punyaTithi: { month: formData.month, paksha: formData.paksha, tithi: formData.tithi.toString() },
-      photoUrl: `https://picsum.photos/seed/${formData.name}/200/200`
+      photoUrl: '' // Starting with empty to trigger placeholder
     });
     setIsAdding(false);
     setFormData({ name: '', relation: '', gender: 'Male', month: 'Kartik', paksha: 'Krishna', tithi: 1 });
@@ -53,7 +74,12 @@ export const AncestorManagement: React.FC = () => {
         {ancestors.map(a => (
           <div key={a.id} className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-orange-100 flex items-center space-x-4">
             <div className="relative">
-              <img src={a.photoUrl} className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-200" alt={a.name} />
+              <ImageWithFallback 
+                src={a.photoUrl} 
+                name={a.name} 
+                gender={a.gender}
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-orange-200" 
+              />
               <div className="absolute -bottom-1 -right-1 bg-red-600 p-1 rounded-full text-white shadow-md">
                 <Heart size={10} fill="currentColor" />
               </div>

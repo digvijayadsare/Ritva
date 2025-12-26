@@ -1,24 +1,114 @@
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../store';
-import { ChevronRight, Bell, Heart, BookOpen, Calendar as CalendarIcon, Sparkles } from 'lucide-react';
+import { ChevronRight, Heart, BookOpen, Calendar as CalendarIcon, Sparkles, User, Bell, Cake, ShoppingBasket, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { PANCHANG_DATA_MAP } from '../constants';
 
+const ImageWithFallback = ({ src, name, gender, className }: { src?: string, name: string, gender?: string, className: string }) => {
+  const [error, setError] = useState(false);
+  
+  if (!src || error) {
+    return (
+      <div className={`${className} flex items-center justify-center overflow-hidden ${
+        gender === 'Female' ? 'bg-pink-50 text-pink-200' : 'bg-blue-50 text-blue-200'
+      }`}>
+        <User size={24} strokeWidth={1.5} />
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={src} 
+      className={className} 
+      alt={name} 
+      onError={() => setError(true)} 
+    />
+  );
+};
+
 export const Dashboard: React.FC = () => {
-  const { traditions, family, ancestors } = useApp();
+  const { traditions, family } = useApp();
   const navigate = useNavigate();
 
   const today = new Date();
   const todayStr = format(today, 'yyyy-MM-dd');
+  const todayMd = format(today, 'MM-dd');
   const todayPanchang = PANCHANG_DATA_MAP[todayStr];
 
-  // Logic to show a relevant banner
-  const bannerTitle = todayPanchang?.name || "Daily Panchang";
-  const bannerSubtitle = todayPanchang 
-    ? `${todayPanchang.month} ${todayPanchang.tithi}`
-    : "Auspicious Tithi & Timings";
+  // 1. Logic for Today's Family Events (One-liner)
+  const todayFamilyEvent = useMemo(() => {
+    const lineage = family?.lineage || [];
+    const member = lineage.find(m => {
+      const b = m.birthDate ? format(new Date(m.birthDate), 'MM-dd') : null;
+      const d = (m.isDeceased && m.deathDate) ? format(new Date(m.deathDate), 'MM-dd') : null;
+      return b === todayMd || d === todayMd;
+    });
+
+    if (!member) return null;
+    const isBday = member.birthDate && format(new Date(member.birthDate), 'MM-dd') === todayMd;
+    return {
+      name: member.name,
+      type: isBday ? 'Birthday' : 'Remembrance',
+      label: isBday ? `Today: ${member.name}'s Birthday` : `Today: ${member.name}'s Punya Tithi`
+    };
+  }, [family, todayMd]);
+
+  // 2. Logic for Upcoming Events (Next 15 days)
+  const upcomingHighlights = useMemo(() => {
+    const highlights = [];
+    const lineage = family?.lineage || [];
+    
+    for (let i = 1; i <= 15; i++) {
+      const futureDate = addDays(today, i);
+      const futureKey = format(futureDate, 'yyyy-MM-dd');
+      const futureMd = format(futureDate, 'MM-dd');
+      
+      const fest = PANCHANG_DATA_MAP[futureKey];
+      if (fest) {
+        highlights.push({
+          type: 'Festival',
+          title: fest.name,
+          date: futureDate,
+          subtitle: `${fest.month} ${fest.tithi}`,
+          raw: fest
+        });
+      }
+      
+      lineage.forEach(m => {
+        if (m.birthDate && format(new Date(m.birthDate), 'MM-dd') === futureMd) {
+          highlights.push({
+            type: 'Birthday',
+            title: `${m.name}'s Birthday`,
+            date: futureDate,
+            subtitle: 'Family Celebration'
+          });
+        }
+        if (m.isDeceased && m.deathDate && format(new Date(m.deathDate), 'MM-dd') === futureMd) {
+          highlights.push({
+            type: 'Remembrance',
+            title: `${m.name}'s Remembrance`,
+            date: futureDate,
+            subtitle: 'Ancestral Punya Tithi'
+          });
+        }
+      });
+    }
+    return highlights.sort((a, b) => a.date.getTime() - b.date.getTime());
+  }, [family, today]);
+
+  const nextEvent = upcomingHighlights[0];
+
+  // 3. Find if the next event has a matching ritual in traditions
+  const linkedRitual = useMemo(() => {
+    if (!nextEvent) return null;
+    return traditions.find(t => 
+      t.title.toLowerCase().includes(nextEvent.title.toLowerCase()) || 
+      (nextEvent.type === 'Festival' && t.linkedFestivalId === nextEvent.title)
+    );
+  }, [nextEvent, traditions]);
 
   return (
     <div className="space-y-8">
@@ -32,128 +122,147 @@ export const Dashboard: React.FC = () => {
         </div>
       </header>
 
-      {/* Quick Lineage Card */}
+      {/* Quick Identity Section */}
       <section className="bg-white rounded-[2rem] p-6 shadow-sm border-b-4 border-orange-200">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-black text-gray-900">Family Roots</h3>
-          <span className="bg-orange-600 text-white text-[10px] px-2 py-1 rounded font-bold uppercase tracking-widest">Verified</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="space-y-1">
-            <p className="text-[10px] text-gray-400 font-bold uppercase">Gotra</p>
-            <p className="font-bold text-gray-800 text-sm truncate">{family?.gotra || '--'}</p>
+        <div className="flex items-center justify-around">
+          <div className="text-center px-2 flex-1">
+            <p className="text-[9px] text-orange-900/40 font-black uppercase tracking-widest mb-1">Gotra</p>
+            <p className="font-black text-orange-950 text-xs sm:text-sm">{family?.gotra || '--'}</p>
           </div>
-          <div className="space-y-1">
-            <p className="text-[10px] text-gray-400 font-bold uppercase">Kuladevata</p>
-            <p className="font-bold text-gray-800 text-sm truncate">{family?.kuladevata || '--'}</p>
+          <div className="w-px h-8 bg-orange-100 shrink-0"></div>
+          <div className="text-center px-2 flex-1">
+            <p className="text-[9px] text-orange-900/40 font-black uppercase tracking-widest mb-1">Kuladevata</p>
+            <p className="font-black text-orange-950 text-xs sm:text-sm">{family?.kuladevata || '--'}</p>
           </div>
-          <div className="space-y-1">
-            <p className="text-[10px] text-gray-400 font-bold uppercase">Kuldevi</p>
-            <p className="font-bold text-gray-800 text-sm truncate">{family?.kuldevi || '--'}</p>
+          <div className="w-px h-8 bg-orange-100 shrink-0"></div>
+          <div className="text-center px-2 flex-1">
+            <p className="text-[9px] text-orange-900/40 font-black uppercase tracking-widest mb-1">Kuldevi</p>
+            <p className="font-black text-orange-950 text-xs sm:text-sm">{family?.kuldevi || '--'}</p>
           </div>
         </div>
       </section>
 
-      {/* Dynamic Tithi Banner - Fixed Readability & Image */}
-      <section 
-        className="relative h-72 rounded-[3rem] overflow-hidden shadow-xl cursor-pointer ring-4 ring-white group bg-orange-50 border border-orange-100"
-        onClick={() => navigate('/calendar')}
-      >
-        <div className="absolute inset-0">
-          <img 
-            src="https://images.unsplash.com/photo-1561339396-932d1f953282?auto=format&fit=crop&q=80&w=1200" 
-            alt="Ritual Background" 
-            className="w-full h-full object-cover opacity-80 mix-blend-multiply group-hover:scale-105 transition-transform duration-1000"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1543165365-07232ed12fad?auto=format&fit=crop&q=80&w=1200';
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-orange-50/90 via-orange-50/20 to-transparent"></div>
-        </div>
+      {/* Main Feature Containers */}
+      <div className="grid grid-cols-1 gap-6">
         
-        <div className="absolute inset-0 p-8 flex flex-col justify-end">
-          <div className="flex items-center gap-2 bg-orange-950 text-white px-4 py-1.5 rounded-full text-[10px] font-black w-fit mb-4 uppercase tracking-[0.15em] shadow-lg">
-            <Sparkles size={12} className="text-orange-400" />
-            {todayPanchang ? "Today's Celebration" : "Current Tithi"}
+        {/* Container 1: Daily Panchang */}
+        <section 
+          className="relative h-72 rounded-[3.5rem] overflow-hidden shadow-2xl cursor-pointer ring-4 ring-white group bg-orange-950"
+          onClick={() => navigate('/calendar')}
+        >
+          <div className="absolute inset-0">
+            <img 
+              src="https://images.unsplash.com/photo-1543165365-07232ed12fad?auto=format&fit=crop&q=80&w=1200" 
+              alt="Ritual Diyas" 
+              className="w-full h-full object-cover opacity-60 group-hover:scale-105 transition-transform duration-1000"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-orange-950 via-orange-950/20 to-transparent"></div>
           </div>
           
-          <h2 className="title-font text-5xl text-orange-950 font-black mb-1 drop-shadow-sm">
-            {bannerTitle}
-          </h2>
-          
-          <div className="flex items-center gap-2 text-orange-900 text-xl font-bold">
-            <CalendarIcon size={20} className="text-orange-600" />
-            <span>{bannerSubtitle}</span>
-          </div>
-          
-          <p className="text-orange-900/60 text-xs mt-3 font-black uppercase tracking-[0.2em]">
-            {format(today, 'EEEE, MMMM do')}
-          </p>
-        </div>
-      </section>
+          <div className="absolute inset-0 p-8 flex flex-col justify-end">
+            <div className="flex items-center gap-2 bg-orange-600 text-white px-3 py-1.5 rounded-full text-[9px] font-black w-fit mb-4 uppercase tracking-[0.1em] shadow-lg">
+              <Sparkles size={10} className="text-orange-200" />
+              Daily Panchang
+            </div>
+            
+            <h2 className="title-font text-5xl text-white font-black mb-1">
+              {todayPanchang?.name || format(today, 'MMMM do')}
+            </h2>
+            
+            <div className="flex items-center gap-2 text-orange-200 text-lg font-bold">
+              <CalendarIcon size={18} />
+              <span>{todayPanchang ? `${todayPanchang.month} ${todayPanchang.tithi}` : format(today, 'EEEE')}</span>
+            </div>
 
-      {/* Upcoming Punya Tithis Section */}
-      {ancestors && ancestors.length > 0 && (
-        <section>
-          <div className="flex justify-between items-center mb-6 px-1">
-            <h3 className="font-black text-gray-900 text-2xl">Remembrances</h3>
-            <button onClick={() => navigate('/ancestors')} className="text-orange-700 font-bold flex items-center gap-1 text-sm">
-              All Elders <ChevronRight size={18} />
-            </button>
-          </div>
-          <div className="bg-white rounded-[2rem] p-6 border-2 border-orange-50 shadow-sm">
-            {ancestors.slice(0, 2).map((a, idx) => (
-              <div key={a.id} className={`flex items-center gap-4 ${idx > 0 ? 'mt-4 pt-4 border-t border-orange-100' : ''}`}>
-                <div className="w-14 h-14 bg-orange-50 rounded-2xl border-2 border-orange-100 overflow-hidden shrink-0 shadow-inner">
-                  <img src={a.photoUrl || `https://picsum.photos/seed/${a.id}/100/100`} className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-black text-gray-950 text-base">{a.name}</h4>
-                  <p className="text-orange-800 text-xs font-bold uppercase tracking-wider opacity-80">
-                    {a.punyaTithi?.month} {a.punyaTithi?.tithi} • {a.punyaTithi?.paksha}
-                  </p>
-                </div>
-                <div className="bg-orange-50 p-2.5 rounded-xl border border-orange-100">
-                  <Heart size={20} className="text-red-500" fill="currentColor" />
-                </div>
+            {todayFamilyEvent && (
+              <div className="mt-4 flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20 w-full">
+                <div className={`w-2 h-2 rounded-full animate-pulse ${todayFamilyEvent.type === 'Birthday' ? 'bg-blue-400' : 'bg-red-400'}`}></div>
+                <p className="text-xs font-black text-white uppercase tracking-widest truncate">
+                  {todayFamilyEvent.label}
+                </p>
               </div>
-            ))}
+            )}
           </div>
         </section>
-      )}
 
-      {/* Traditions Grid */}
+        {/* Container 2: Upcoming Highlights */}
+        <section 
+          className="relative h-72 rounded-[3.5rem] overflow-hidden shadow-2xl ring-4 ring-white bg-white group border border-orange-50"
+        >
+          <div className="absolute inset-0">
+            <img 
+              src="https://images.unsplash.com/photo-1517373116369-9bdb8ca51622?auto=format&fit=crop&q=80&w=1200" 
+              alt="Marigold Background" 
+              className="w-full h-full object-cover opacity-10 group-hover:scale-105 transition-transform duration-1000"
+            />
+          </div>
+          
+          <div className="absolute inset-0 p-8 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-[9px] font-black w-fit mb-4 uppercase tracking-[0.1em] border border-blue-100">
+                <Bell size={10} />
+                Upcoming Heritage
+              </div>
+              
+              <h2 className="title-font text-4xl text-orange-950 font-black mb-1">
+                {nextEvent ? nextEvent.title : "No Major Events"}
+              </h2>
+              
+              <div className="flex items-center gap-2 text-orange-800 text-lg font-bold opacity-70">
+                {nextEvent?.type === 'Birthday' ? <Cake size={18} /> : nextEvent?.type === 'Remembrance' ? <Heart size={18} /> : <Sparkles size={18} />}
+                <span>{nextEvent ? `${format(nextEvent.date, 'MMM do')} • ${nextEvent.subtitle}` : "Scan History"}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button 
+                onClick={() => navigate('/calendar')}
+                className="flex-1 bg-orange-50 text-orange-900 py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest border border-orange-100 active:scale-95 transition-transform"
+              >
+                View Timeline
+              </button>
+              
+              {linkedRitual && (
+                <button 
+                  onClick={() => navigate(`/tradition/${linkedRitual.id}`)}
+                  className="flex-[1.5] bg-orange-950 text-white py-4 rounded-[1.5rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-transform"
+                >
+                  <ShoppingBasket size={14} className="text-orange-400" />
+                  Check Ritual
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Family Rituals Highlights */}
       <section>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 px-1">
           <h3 className="font-black text-gray-900 text-2xl">Family Rituals</h3>
-          <button className="text-orange-700 font-bold flex items-center gap-1">
-            View All <ChevronRight size={20} />
+          <button onClick={() => navigate('/create')} className="text-orange-700 font-bold flex items-center gap-1 text-sm">
+            Record New <ArrowRight size={16} />
           </button>
         </div>
         <div className="grid grid-cols-1 gap-4">
           {traditions.length === 0 ? (
-            <div className="bg-white rounded-[2rem] p-8 text-center border-2 border-dashed border-orange-100">
-              <p className="text-gray-400 font-bold">No rituals recorded yet.</p>
-              <button 
-                onClick={() => navigate('/create')}
-                className="mt-4 bg-orange-950 text-white px-6 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-all"
-              >
-                Add First Tradition
-              </button>
+            <div className="bg-white rounded-[2.5rem] p-10 text-center border-2 border-dashed border-orange-100">
+              <p className="text-gray-400 font-bold">Your heritage vault is empty.</p>
+              <button onClick={() => navigate('/create')} className="mt-4 text-orange-700 font-black text-xs uppercase tracking-widest">Start First Entry</button>
             </div>
           ) : (
-            traditions.map(t => (
+            traditions.slice(0, 3).map(t => (
               <div 
                 key={t.id}
                 onClick={() => navigate(`/tradition/${t.id}`)}
-                className="bg-white rounded-[2rem] p-5 shadow-sm border border-orange-50 flex items-center gap-4 active:scale-95 transition-transform"
+                className="bg-white rounded-[2.5rem] p-5 shadow-sm border border-orange-50 flex items-center gap-5 active:scale-95 transition-transform"
               >
-                <div className="w-20 h-20 bg-orange-50 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 border border-orange-100">
+                <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 border border-orange-100">
                   <img src={`https://picsum.photos/seed/${t.id}/200/200`} className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1">
-                  <h4 className="font-black text-gray-900 text-lg leading-tight">{t.title}</h4>
-                  <p className="text-orange-700 text-[10px] font-black uppercase tracking-widest mt-1">{t.category}</p>
+                  <h4 className="font-black text-gray-900 text-base leading-tight">{t.title}</h4>
+                  <span className="text-orange-700 text-[9px] font-black uppercase tracking-widest mt-1 block">{t.category}</span>
                 </div>
                 <ChevronRight className="text-orange-200" />
               </div>
@@ -161,6 +270,8 @@ export const Dashboard: React.FC = () => {
           )}
         </div>
       </section>
+
+      <div className="h-10"></div>
     </div>
   );
 };
