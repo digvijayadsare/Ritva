@@ -43,12 +43,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(true);
     
     const initialLineage: FamilyMember[] = [
-      { id: 'm1', name: 'Late Ganpatrao Patil', relation: 'Grandfather', gender: 'Male', isDeceased: true, punyaTithi: { month: 'Kartik', paksha: 'Krishna', tithi: 'Ashtami' } },
-      { id: 'm2', name: 'Late Savitribai Patil', relation: 'Grandmother', gender: 'Female', isDeceased: true, spouseId: 'm1' },
-      { id: 'm3', name: 'Suresh Patil', relation: 'Father', gender: 'Male', isDeceased: false, parentId: 'm1' },
-      { id: 'm4', name: 'Meena Patil', relation: 'Mother', gender: 'Female', isDeceased: false, spouseId: 'm3' },
-      { id: 'm5', name: 'Rajesh Patil', relation: 'Self', gender: 'Male', isDeceased: false, parentId: 'm3' },
-      { id: 'm6', name: 'Sunita Deshmukh', relation: 'Sister', gender: 'Female', isDeceased: false, parentId: 'm3' },
+      { 
+        id: 'm1', name: 'Late Ganpatrao Patil', relation: 'Grandfather', gender: 'Male', isDeceased: true, 
+        birthDate: '1940-05-15', deathDate: '2020-10-22',
+        punyaTithi: { month: 'Kartik', paksha: 'Krishna', tithi: 'Ashtami' } 
+      },
+      { 
+        id: 'm2', name: 'Late Savitribai Patil', relation: 'Grandmother', gender: 'Female', isDeceased: true, 
+        birthDate: '1945-08-10', deathDate: '2018-02-14',
+        spouseId: 'm1' 
+      },
+      { id: 'm3', name: 'Suresh Patil', relation: 'Father', gender: 'Male', isDeceased: false, parentId: 'm1', birthDate: '1968-03-22' },
+      { id: 'm4', name: 'Meena Patil', relation: 'Mother', gender: 'Female', isDeceased: false, spouseId: 'm3', birthDate: '1972-11-12' },
+      { id: 'm5', name: 'Rajesh Patil', relation: 'Self', gender: 'Male', isDeceased: false, parentId: 'm3', birthDate: '1995-06-25' },
+      { id: 'm6', name: 'Sunita Deshmukh', relation: 'Sister', gender: 'Female', isDeceased: false, parentId: 'm3', birthDate: '1998-09-02' },
     ];
 
     setFamily({

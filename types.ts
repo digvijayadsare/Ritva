@@ -51,10 +51,12 @@ export interface FamilyMember {
   name: string;
   relation: string;
   gender: 'Male' | 'Female' | 'Other';
-  parentId?: string; // Original parent link
-  spouseId?: string; // Links to spouse node
+  parentId?: string;
+  spouseId?: string;
   isDeceased: boolean;
   punyaTithi?: PanchangTithi;
+  birthDate?: string; // ISO YYYY-MM-DD
+  deathDate?: string; // ISO YYYY-MM-DD
   photoUrl?: string;
 }
 
